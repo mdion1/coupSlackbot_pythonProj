@@ -47,9 +47,10 @@ class CoupSlackBotMsgInterface:
             'help':                     functionWrapper(0, self._interfaceFn_sendInsructionList),
             'draw card':                functionWrapper(0, self._interfaceFn_userDrawCard),
             'replace card':             functionWrapper(1, self._interfaceFn_userReplaceCard, "Please specify card."),   #card name as arg
+            'kill card':                functionWrapper(1, self._interfaceFn_userKillCard, "Please specify card."),   #card name as arg
             'status':                   functionWrapper(1, self._interfaceFn_sendStatusMsg, "Please specify player name, or type \'status me\' or \'status all\'."),   #player name as arg
-            'status me':                functionWrapper(0, self._interfaceFn_sendStatusMeMsg),
-            'status all':               functionWrapper(0, self._interfaceFn_sendStatusAllMsg),
+            #'status me':                functionWrapper(0, self._interfaceFn_sendStatusMeMsg),
+            #'status all':               functionWrapper(0, self._interfaceFn_sendStatusAllMsg),
             'take coins':               functionWrapper(1, self._interfaceFn_userTakeCoins, "Please specify how many coins."),   #number of coins as arg
             'steal two coins from':     functionWrapper(1, self._interfaceFn_userStealCoinsFrom, "Please specify player name."), #player name as arg
             'return two coins to':      functionWrapper(1, self._interfaceFn_userReturnCoinsTo, "Please specify player name."),  #playe name as arg
@@ -69,7 +70,7 @@ class CoupSlackBotMsgInterface:
             print(traceback.format_exc())
         else:
             self._workspaceUsers = response.get('members')
-            #todo: remove users with "deleted" = True and "is_bot" = True
+            #todo: remove users with "deleted" = True and "is_bot" = True, don't allow user names "me" or "all"
 
     ''' ************* User ID and Channel ID mapping functions ************* '''
     def _getUserIdFromDisplayName(self, playerNameArgs: list):
@@ -119,7 +120,7 @@ class CoupSlackBotMsgInterface:
             print(traceback.format_exc())
     
     def _postGeneralMessage(self, text):
-        if len(self._gameChannelID < 1):
+        if len(self._gameChannelID) < 1:
             return
         payload = {
             "channel": self._gameChannelID,
@@ -131,8 +132,8 @@ class CoupSlackBotMsgInterface:
 
     ''' ************* 'Public' functions ************* '''
     def parseMsg(self, jsonMsg):
-        #print(jsonMsg)
         event = jsonMsg.get('event')
+        print(event)
 
         #check if event is a message
         if not event.get('type') == 'message':
@@ -228,6 +229,8 @@ class CoupSlackBotMsgInterface:
             self._playerRoster[playerID] = playerDisplayName
             self._coupgame.AddPlayer(playerDisplayName)
             self._sendMessageToAdmin(self.SUCCESS_MSG)
+            txt = playerDisplayName + " has joined the game!"
+            self._postGeneralMessage(txt)
             return
 
     def _adminInterfaceFn_sendInstructionListAdmin(self, dummyArgs: list, userId: str):
@@ -258,25 +261,88 @@ class CoupSlackBotMsgInterface:
     def _interfaceFn_userDrawCard(self, dummyArgs: list, userId: str):
         dispName = self._getDisplayNameFromUserId(userId)
         cardName = ""
-        if dispName in self._playerRoster:
+        if userId in self._playerRoster.keys():
+            dispName = self._playerRoster[userId]
             cardName = self._coupgame.playerDrawsCard(dispName)
         if len(cardName) > 0:
             txt = "You drew: " + cardName
             txt += "\nYour hand contains: " + self._coupgame.getPlayerHand(dispName)
             self._sendMessageToUser(txt, userId)
+            txt = dispName + " drew a card"
+            self._postGeneralMessage(txt)
         return
 
     def _interfaceFn_userReplaceCard(self, cardNameArgList: list, userId: str):
-        return #todo
+        cardName = cardNameArgList[0]
+        txt = ""
+        if userId in self._playerRoster.keys():
+            dispName = self._playerRoster[userId]
+            result = self._coupgame.playerReplaceCard(dispName, cardName)
+            if result == True:
+                txt = "Your hand contains: " + self._coupgame.getPlayerHand(dispName)
+                cardsLeft = self._coupgame.cardsRemainingInDeck()
+                generalTxt = dispName + " has replaced a card into the deck (" + str(cardsLeft) + " cards remaining)."
+                self._postGeneralMessage(generalTxt)
+            else:
+                txt = "Unable to replace " + cardName + '.'
+        else:
+            txt = "You are not in the game!"
+        self._sendMessageToUser(txt, userId) 
+        return
 
+    def _interfaceFn_userKillCard(self, cardNameArgList: list, userId: str):
+        cardName = cardNameArgList[0]
+        txt = ""
+        if userId in self._playerRoster.keys():
+            dispName = self._playerRoster[userId]
+            result = self._coupgame.playerKillCard(dispName, cardName)
+            if result == True:
+                cardsLeft = []
+                txt = "Your hand contains: " + self._coupgame.getPlayerHand(dispName, cardsLeft)
+                generalTxt = dispName + " has lost a " + cardName + " and has " + str(cardsLeft[0]) + " cards remaining)."
+                self._postGeneralMessage(generalTxt)
+            else:
+                txt = "Unable to kill " + cardName + '.'
+        else:
+            txt = "You are not in the game!"
+        self._sendMessageToUser(txt, userId) 
+        return #todo
+    
     def _interfaceFn_sendStatusMsg(self, playerNameArgList: list, userId: str):
-        return #todo
+        dispName = ""
+        hideCardNames = True
+        targetPlayerId = self._getUserIdFromDisplayName(playerNameArgList)
+        if matchTextInArray("me", playerNameArgList):
+            if userId in self._playerRoster.keys():
+                dispName = self._playerRoster[userId]
+                hideCardNames = False
+        elif matchTextInArray("all", playerNameArgList):
+            dispName = 'all'
+            hideCardNames = True
+        elif targetPlayerId in self._playerRoster.keys():
+            dispName = self._playerRoster[targetPlayerId]
+            hideCardNames = True
+        if len(dispName) > 0:
+            txt = self._coupgame.getStatus(playerName=dispName, maskCards=hideCardNames)
+            self._sendMessageToUser(txt, userId)
+        else
+            self._sendMessageToUser("This player is not in the game!", userId)
+        return
 
-    def _interfaceFn_sendStatusMeMsg(self, dummyArgs: list, userId: str):
-        return #todo
+    '''def _interfaceFn_sendStatusMeMsg(self, dummyArgs: list, userId: str):
+        dispName = self._getDisplayNameFromUserId(userId)
+        txt = ""
+        if userId in self._playerRoster.keys():
+            dispName = self._playerRoster[userId]
+            txt = self._coupgame.getStatus(playerName=dispName, maskCards=False)
+        else:
+            txt = "You are not in the game!"
+        self._sendMessageToUser(txt, userId) 
+        return
 
     def _interfaceFn_sendStatusAllMsg(self, dummyArgs: list, userId: str):
-        return #todo
+        self._sendMessageToUser(self._coupgame.getStatus(playerName='all', maskCards=True), userId) 
+        return'''
 
     def _interfaceFn_userTakeCoins(self, numCoinsArgList: list, userId: str):
         return #todo
@@ -302,15 +368,15 @@ class CoupSlackBotMsgInterface:
             return
 
         #add the user to the roster, invite the user to join the channel
-        playerDisplayName = self._getDisplayNameFromUserId(playerID)
+        playerDisplayName = self._getDisplayNameFromUserId(userId)
         try:
-            self._webclient.conversations_invite(channel=self._gameChannelID,users=playerID)
+            self._webclient.conversations_invite(channel=self._gameChannelID,users=userId)
         except:
             txt = self.ERR_UNABLE_TO_ADD_PLAYER + traceback.format_exc()
             self._sendMessageToAdmin(txt)
             return
         else:
-            self._playerRoster[playerID] = playerDisplayName
+            self._playerRoster[userId] = playerDisplayName
             self._coupgame.AddPlayer(playerDisplayName)
             self._sendMessageToUser(self.SUCCESS_MSG, userId)
             return
