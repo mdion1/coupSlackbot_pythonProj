@@ -1,7 +1,7 @@
 import slack
 from slack import WebClient
 from CoupGame import CoupGame
-import sys
+import traceback
 from functionWrapper import functionWrapper
 
 def matchTextInArray(textToFind: str, textList: list, separator = ' ', removeMatchedTextFromSearchList = False):
@@ -22,9 +22,9 @@ class CoupSlackBotMsgInterface:
     ''' ************* Error messages ************* '''
     SUCCESS_MSG = "Success!"
     ERR_PLAYER_ID_NOT_FOUND = "Player not found."
-    ERR_UNABLE_TO_ADD_PLAYER = "Unable to add player."
+    ERR_UNABLE_TO_ADD_PLAYER = "Unable to add player: "
     ERR_NO_GAME_CREATED = "No game has been created yet."
-    ERR_CREATE_CHANNEL_FAILED = "Failed to create channel."
+    ERR_CREATE_CHANNEL_FAILED = "Failed to create channel: "
     ERR_CHANNEL_ALREADY_EXISTS = "Channel already exists, try a different name."
     ERR_COMMAND_NOT_RECOGNIZED = "Command not recognized, type \'help\' for a list of commands."
     ERR_NO_ADMIN_PRIVILEGES = "Nice try, you don't have admin privileges..."
@@ -66,7 +66,7 @@ class CoupSlackBotMsgInterface:
         try:
             response = self._webclient.users_list()
         except:
-            print(sys.exc_info()[0])
+            print(traceback.format_exc())
         else:
             self._workspaceUsers = response.get('members')
             #todo: remove users with "deleted" = True and "is_bot" = True
@@ -76,12 +76,18 @@ class CoupSlackBotMsgInterface:
         for user in self._workspaceUsers:
             if matchTextInArray(user.get('profile').get('display_name'), playerNameArgs):
                 return user.get('id')
+            #if "Display Name" is empty, check "Real Name"
+            elif matchTextInArray(user.get('profile').get('real_name'), playerNameArgs):
+                return user.get('id')
         return ""
 
     def _getDisplayNameFromUserId(self, userId: str):
         for user in self._workspaceUsers:
             if user.get('id') == userId:
-                return user.get('profile').get('display_name')
+                ret = user.get('profile').get('display_name')
+                if len(ret) < 1:        #if 'display_name' is empty, use 'real_name'
+                    ret = user.get('profile').get('real_name')
+                return ret
         return ""
 
     def _getChannelIDFromUserId(self, userId: str):
@@ -110,7 +116,7 @@ class CoupSlackBotMsgInterface:
         try:
             self._webclient.chat_postMessage(**payload)
         except:
-            print(sys.exc_info()[0])
+            print(traceback.format_exc())
     
     def _postGeneralMessage(self, text):
         if len(self._gameChannelID < 1):
@@ -154,7 +160,7 @@ class CoupSlackBotMsgInterface:
                 for key in self._ValidAdminCommands.keys():
                     if matchTextInArray(key, messageBody, removeMatchedTextFromSearchList=True):
                         errorMsg = self._ValidAdminCommands[key].execute(messageBody, userId)
-                        if len(errorMsg > 0):
+                        if len(errorMsg) > 0:
                             self._sendMessageToAdmin(errorMsg)
                         commandFound = True
                         break
@@ -173,7 +179,7 @@ class CoupSlackBotMsgInterface:
                     commandFound = True
                     break
             if not commandFound:
-                    self._sendMessageToUser(self.ERR_COMMAND_NOT_RECOGNIZED, userId)
+                self._sendMessageToUser(self.ERR_COMMAND_NOT_RECOGNIZED, userId)
 
     ''' ************* Admin interface functions ************* '''
     def _adminInterfaceFn_startNewGame(self, gameNameArgs: list, userId: str):
@@ -201,7 +207,7 @@ class CoupSlackBotMsgInterface:
         #if player is already on the roster, return
         for playerName in self._playerRoster.values():
             if matchTextInArray(playerName, playerNameArgs):
-                self._sendMessageToAdmin(ERR_PLAYER_IS_ALREADY_IN_GAME)
+                self._sendMessageToAdmin(self.ERR_PLAYER_IS_ALREADY_IN_GAME)
                 return
 
         #check if the user exists in the workspace
@@ -215,8 +221,8 @@ class CoupSlackBotMsgInterface:
         try:
             self._webclient.conversations_invite(channel=self._gameChannelID,users=playerID)
         except:
-            print(sys.exc_info()[0])
-            self._sendMessageToAdmin(self.ERR_UNABLE_TO_ADD_PLAYER)
+            txt = self.ERR_UNABLE_TO_ADD_PLAYER + traceback.format_exc()
+            self._sendMessageToAdmin(txt)
             return
         else:
             self._playerRoster[playerID] = playerDisplayName
@@ -224,7 +230,7 @@ class CoupSlackBotMsgInterface:
             self._sendMessageToAdmin(self.SUCCESS_MSG)
             return
 
-    def _adminInterfaceFn_sendInstructionListAdmin(self, dummyArgs: list):
+    def _adminInterfaceFn_sendInstructionListAdmin(self, dummyArgs: list, userId: str):
         if not userId == ADMIN_USER:
             return
             
@@ -250,7 +256,15 @@ class CoupSlackBotMsgInterface:
         self._sendMessageToUser(txt, userId)
 
     def _interfaceFn_userDrawCard(self, dummyArgs: list, userId: str):
-        return #todo
+        dispName = self._getDisplayNameFromUserId(userId)
+        cardName = ""
+        if dispName in self._playerRoster:
+            cardName = self._coupgame.playerDrawsCard(dispName)
+        if len(cardName) > 0:
+            txt = "You drew: " + cardName
+            txt += "\nYour hand contains: " + self._coupgame.getPlayerHand(dispName)
+            self._sendMessageToUser(txt, userId)
+        return
 
     def _interfaceFn_userReplaceCard(self, cardNameArgList: list, userId: str):
         return #todo
@@ -277,7 +291,29 @@ class CoupSlackBotMsgInterface:
         return #todo
 
     def _interfaceFn_joinGame(self, dummyArgs: list, userId: str):
-        return #todo
+        #if game has not been created yet (channel name is blank), return
+        if len(self._gameChannelID) < 1:
+            self._sendMessageToUser(self.ERR_NO_GAME_CREATED, userId)
+            return
+
+        #if player is already on the roster, return
+        if userId in self._playerRoster.keys():
+            self._sendMessageToUser(self.ERR_PLAYER_IS_ALREADY_IN_GAME, userId)
+            return
+
+        #add the user to the roster, invite the user to join the channel
+        playerDisplayName = self._getDisplayNameFromUserId(playerID)
+        try:
+            self._webclient.conversations_invite(channel=self._gameChannelID,users=playerID)
+        except:
+            txt = self.ERR_UNABLE_TO_ADD_PLAYER + traceback.format_exc()
+            self._sendMessageToAdmin(txt)
+            return
+        else:
+            self._playerRoster[playerID] = playerDisplayName
+            self._coupgame.AddPlayer(playerDisplayName)
+            self._sendMessageToUser(self.SUCCESS_MSG, userId)
+            return
 
     ''' ************* New game/new channel creation ************* '''
     def _createChannel(self, channelName: str):
@@ -290,8 +326,8 @@ class CoupSlackBotMsgInterface:
         try:
             response = self._webclient.conversations_create(name=channelName)
         except:
-            print(sys.exc_info()[0])
-            return self.ERR_CREATE_CHANNEL_FAILED
+            txt = self.ERR_CREATE_CHANNEL_FAILED + traceback.format_exc()
+            return txt
         else:
             self._gameChannelID = response.get("channel").get("id")
             return self.SUCCESS_MSG
@@ -301,7 +337,7 @@ class CoupSlackBotMsgInterface:
         try:
             response = self._webclient.conversations_list()
         except:
-            print(sys.exc_info()[0])
+            print(traceback.format_exc())
             return {}
         else:
             channelList = response.get('channels')

@@ -1,3 +1,5 @@
+import random
+
 class CoupGame:
     def __init__(self, Name: str):
         self.name = Name
@@ -22,9 +24,33 @@ class CoupGame:
             self._deck.append(Card("Duke"))
             self._deck.append(Card("Ambassador"))
 
+    def isValidPlayer(self, playerName: str):
+        return playerName in self._playerDict.keys()
+    
+    def getPlayerHand(self, playerName: str):
+        ret = ""
+        if self.isValidPlayer(playerName):
+            ret = _playerDict[playerName].getHand()
+        return ret
+    
+    def playerDrawsCard(self, playerName: str):
+        ret = ""
+        if self.isValidPlayer(playerName):
+            cardsInDeck = len(self._deck)
+            if cardsInDeck > 0:
+                index = random.randint(0, cardsInDeck - 1)
+                cardDrawn = self._deck.pop(index)
+                ret = cardDrawn.name()
+                self._playerDict[playerName].addCard(cardDrawn)
+        return ret
+            
+
+
 class Card:
     def __init__(self, name: str):
         self._name = name
+    def name(self):
+        return self._name
 
 class Player:
     def __init__(self, name: str):
@@ -50,3 +76,9 @@ class Player:
         except:
             success = False
         return success
+    
+    def getHand(self):
+        ret = []
+        for card in self._cards:
+            ret.append(card.name())
+        return ', '.join(ret)
