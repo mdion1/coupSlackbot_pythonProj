@@ -65,6 +65,39 @@ class CoupGame:
                 ret = cardDrawn
                 self._playerDict[playerName].addCard(cardDrawn)
         return ret
+
+    def PlayerTakeCoins(self, playerName:str, numCoins: int):
+        if not self.isValidPlayer(playerName):
+            return False
+        self._playerDict[playerName].addCoin(numCoins)
+        return True
+
+    def PlayerReturnCoinsToBank(self, playerName:str, numCoins: int):
+        if not self.isValidPlayer(playerName):
+            return False
+        self._playerDict[playerName].removeCoins(numCoins)
+        return True
+
+    def playerStealsFromPlayer(self, playerName_thief: str, playerName_target: str):
+        if not self.isValidPlayer(playerName_thief):
+            return False
+        if not self.isValidPlayer(playerName_target):
+            return False
+        if self._playerDict[playerName_target].removeCoins(2):
+            self._playerDict[playerName_thief].addCoin(2)
+            return True
+        return False
+
+    def playerGaveCoinsToPlayer(self, playerName_donor: str, playerName_target: str):
+        if not self.isValidPlayer(playerName_donor):
+            return False
+        if not self.isValidPlayer(playerName_target):
+            return False
+        if self._playerDict[playerName_donor].removeCoins(2):
+            self._playerDict[playerName_target].addCoin(2)
+            return True
+        return False
+        
     
     def playerReplaceCard(self, playerName: str, cardName: str):
         if not cardName in self.CARD_NAMES:
@@ -112,8 +145,11 @@ class Player:
         self._coins += abs(numCoins)
     
     def removeCoins(self, numCoins = 1):
-        self._coins -= abs(numCoins)
-        self._coins = max(self._coins, 0)
+        numCoins = abs(numCoins)
+        if self._coins < numCoins:
+            return False
+        self._coins -= numCoins
+        return True
 
     def addCard(self, cardName: str):
         self._cards.append(cardName)

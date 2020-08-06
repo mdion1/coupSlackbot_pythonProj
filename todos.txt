@@ -1,0 +1,11 @@
+todo's:
+-fill in the rest of the user commands
+-overall script for link verification
+-"new game" commands
+-any way to delete old games?
+-guard: empty deck
+-organize coupgame class functions
+-set turn order (admin) or "start", deal out starting cards and coins
+-get turn order (user)
+-declare winner? (automatic after "set turn order" starts the game?)
+-guards on players added: no deleted players, bot players, players named "me" or "all"

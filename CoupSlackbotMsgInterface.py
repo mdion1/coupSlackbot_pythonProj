@@ -325,7 +325,7 @@ class CoupSlackBotMsgInterface:
         if len(dispName) > 0:
             txt = self._coupgame.getStatus(playerName=dispName, maskCards=hideCardNames)
             self._sendMessageToUser(txt, userId)
-        else
+        else:
             self._sendMessageToUser("This player is not in the game!", userId)
         return
 
@@ -345,16 +345,78 @@ class CoupSlackBotMsgInterface:
         return'''
 
     def _interfaceFn_userTakeCoins(self, numCoinsArgList: list, userId: str):
-        return #todo
+        dispName = self._getDisplayNameFromUserId(userId)
+        txt = "Unable to take coins."
+        generalMsg = ""
+        numCoins = 0
+        if userId in self._playerRoster.keys():
+            dispName = self._playerRoster[userId]
+            numCoins = int(numCoinsArgList[0])
+        if numCoins > 0 and numCoins < 3:
+            if self._coupgame.PlayerTakeCoins(dispName, numCoins):
+                txt = "You took " + str(numCoins) + " coins."
+                generalMsg = dispName + " took " + str(numCoins) + " coins."
+        self._sendMessageToUser(txt, userId)
+        if len(generalMsg) > 0:
+            self._postGeneralMessage(generalMsg)
+        return
 
     def _interfaceFn_userStealCoinsFrom(self, playerNameArgList: list, userId: str):
-        return #todo
+        if not userId in self._playerRoster.keys():
+            return
+        dispName_thief = self._playerRoster[userId]
+        playerID_target = self._getUserIdFromDisplayName(playerNameArgList)
+        if not playerID_target in self._playerRoster.keys():
+            return
+        dispName_target = self._playerRoster[playerID_target]
+
+        txt = ""
+        generalTxt = ""
+        if self._coupgame.playerStealsFromPlayer(playerName_thief=dispName_thief, playerName_target=dispName_target):
+            txt = "You stole 2 coins from " + dispName_target
+            generalTxt = dispName_thief + " stole 2 coins from " + dispName_target + "."
+            self._sendMessageToUser(txt, userId)
+            self._postGeneralMessage(generalTxt)
+        else:
+            self._sendMessageToUser("You were unable to steal coins.", userId)
+        return
 
     def _interfaceFn_userReturnCoinsTo(self, playerNameArgList: list, userId: str):
-        return #todo
+        if not userId in self._playerRoster.keys():
+            return
+        dispName_donor = self._playerRoster[userId]
+        playerID_target = self._getUserIdFromDisplayName(playerNameArgList)
+        if not playerID_target in self._playerRoster.keys():
+            return
+        dispName_target = self._playerRoster[playerID_target]
+
+        txt = ""
+        generalTxt = ""
+        if self._coupgame.playerGaveCoinsToPlayer(playerName_donor=dispName_donor, playerName_target=dispName_target):
+            txt = "You returned 2 coins to " + dispName_target
+            generalTxt = dispName_donor + " returned 2 coins to " + dispName_target + "."
+            self._sendMessageToUser(txt, userId)
+            self._postGeneralMessage(generalTxt)
+        else:
+            self._sendMessageToUser("You were unable to return coins.", userId)
+        return
 
     def _interfaceFn_userReturnCoinsToBank(self, numCoinsArgList: list, userId: str):
-        return #todo
+        dispName = self._getDisplayNameFromUserId(userId)
+        txt = "Unable to return coins."
+        generalMsg = ""
+        numCoins = 0
+        if userId in self._playerRoster.keys():
+            dispName = self._playerRoster[userId]
+            numCoins = int(numCoinsArgList[0])
+        if numCoins > 0 and numCoins < 3:
+            if self._coupgame.PlayerReturnCoinsToBank(dispName, numCoins):
+                txt = "You returned " + str(numCoins) + " coins to bank."
+                generalMsg = dispName + " returned " + str(numCoins) + " coins to the bank."
+        self._sendMessageToUser(txt, userId)
+        if len(generalMsg) > 0:
+            self._postGeneralMessage(txt)
+        return
 
     def _interfaceFn_joinGame(self, dummyArgs: list, userId: str):
         #if game has not been created yet (channel name is blank), return
