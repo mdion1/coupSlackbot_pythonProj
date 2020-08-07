@@ -1,5 +1,4 @@
 todo's:
--fill in the rest of the user commands
 -overall script for link verification
 -"new game" commands
 -any way to delete old games?
@@ -9,3 +8,14 @@ todo's:
 -get turn order (user)
 -declare winner? (automatic after "set turn order" starts the game?)
 -guards on players added: no deleted players, bot players, players named "me" or "all"
+
+take out case sensitivity in commands and card names -- done
+"status all" returned msg twice consecutively
+"you returned two coins" is general msg not personal msg -- fixed
+zero cards left "your hand:<blank>", change form to "your hand: no cards" or something explicit
+return coins caps at 2 - fixed
+numerals vs words - "two 2" -- fixed
+"kill card" isn't on the menu -- fixed
+correct "steal two coins from" in help menu -- fixe
+track turn order, prompt user when it's their turn, "whose turn?" command
+sarcastic trash talking responses when you lose a card?

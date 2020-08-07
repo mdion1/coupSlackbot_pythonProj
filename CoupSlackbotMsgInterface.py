@@ -8,7 +8,7 @@ def matchTextInArray(textToFind: str, textList: list, separator = ' ', removeMat
     ret = False
     for i in range(1, len(textList) + 1):
         joinedList = separator.join(textList[0:i])
-        if joinedList == textToFind:
+        if joinedList.lower() == textToFind.lower():
             ret = True
             if removeMatchedTextFromSearchList:
                 newList = textList[i:]
@@ -52,9 +52,9 @@ class CoupSlackBotMsgInterface:
             #'status me':                functionWrapper(0, self._interfaceFn_sendStatusMeMsg),
             #'status all':               functionWrapper(0, self._interfaceFn_sendStatusAllMsg),
             'take coins':               functionWrapper(1, self._interfaceFn_userTakeCoins, "Please specify how many coins."),   #number of coins as arg
-            'steal two coins from':     functionWrapper(1, self._interfaceFn_userStealCoinsFrom, "Please specify player name."), #player name as arg
-            'return two coins to':      functionWrapper(1, self._interfaceFn_userReturnCoinsTo, "Please specify player name."),  #playe name as arg
-            'return coins':             functionWrapper(1, self._interfaceFn_userReturnCoinsToBank, "Please specify how many coins."),   #number of coins as arg
+            'steal coins from':     functionWrapper(1, self._interfaceFn_userStealCoinsFrom, "Please specify player name."), #player name as arg
+            'return stolen coins to':      functionWrapper(1, self._interfaceFn_userReturnCoinsTo, "Please specify player name."),  #playe name as arg
+            'return coins to bank':             functionWrapper(1, self._interfaceFn_userReturnCoinsToBank, "Please specify how many coins."),   #number of coins as arg
             'join game':                functionWrapper(0, self._interfaceFn_joinGame)
         }
 
@@ -249,13 +249,14 @@ class CoupSlackBotMsgInterface:
         txt = "List of commands:\n"
         txt += "\t-draw card\n"
         txt += "\t-replace card <card name>\n"
+        txt += "\t-kill card <card name>\n"
         txt += "\t-status <playername>\n"
         txt += "\t-status me\n"
         txt += "\t-status all\n"
-        txt += "\t-take coins <number of coins (1 to 3)\n"
-        txt += "\t-steal two coins <player name>\n"
-        txt += "\t-return two coins to <player name>\n"
-        txt += "\t-return coins <number of coins>"
+        txt += "\t-take coins <number of coins>\n"
+        txt += "\t-steal coins from <player name>\n"
+        txt += "\t-return stolen coins to <player name>\n"
+        txt += "\t-return coins to bank <number of coins>"
         self._sendMessageToUser(txt, userId)
 
     def _interfaceFn_userDrawCard(self, dummyArgs: list, userId: str):
@@ -352,7 +353,6 @@ class CoupSlackBotMsgInterface:
         if userId in self._playerRoster.keys():
             dispName = self._playerRoster[userId]
             numCoins = int(numCoinsArgList[0])
-        if numCoins > 0 and numCoins < 3:
             if self._coupgame.PlayerTakeCoins(dispName, numCoins):
                 txt = "You took " + str(numCoins) + " coins."
                 generalMsg = dispName + " took " + str(numCoins) + " coins."
@@ -409,13 +409,12 @@ class CoupSlackBotMsgInterface:
         if userId in self._playerRoster.keys():
             dispName = self._playerRoster[userId]
             numCoins = int(numCoinsArgList[0])
-        if numCoins > 0 and numCoins < 3:
             if self._coupgame.PlayerReturnCoinsToBank(dispName, numCoins):
                 txt = "You returned " + str(numCoins) + " coins to bank."
                 generalMsg = dispName + " returned " + str(numCoins) + " coins to the bank."
         self._sendMessageToUser(txt, userId)
         if len(generalMsg) > 0:
-            self._postGeneralMessage(txt)
+            self._postGeneralMessage(generalMsg)
         return
 
     def _interfaceFn_joinGame(self, dummyArgs: list, userId: str):

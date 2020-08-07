@@ -41,7 +41,7 @@ class CoupGame:
     def _initDeck(self, numCopiesPerCard = 3):
         for i in range(0, numCopiesPerCard):
             for cardName in self.CARD_NAMES:
-                self._deck.append(cardName)
+                self._deck.append(cardName.lower())
 
     def isValidPlayer(self, playerName: str):
         return playerName in self._playerDict.keys()
@@ -100,7 +100,7 @@ class CoupGame:
         
     
     def playerReplaceCard(self, playerName: str, cardName: str):
-        if not cardName in self.CARD_NAMES:
+        if not cardName.lower() in self.CARD_NAMES:
             return False
         if not self.isValidPlayer(playerName):
             return False
@@ -111,7 +111,7 @@ class CoupGame:
         return False
     
     def playerKillCard(self, playerName: str, cardName: str):
-        if not cardName in self.CARD_NAMES:
+        if not cardName.lower() in self.CARD_NAMES:
             return False
         if not self.isValidPlayer(playerName):
             return False
