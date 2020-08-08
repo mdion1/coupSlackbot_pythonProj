@@ -1,7 +1,7 @@
 import random
 
 class CoupGame:
-    CARD_NAMES = [ "Assassin", "Contessa", "Duke", "Captain", "Ambassador" ]
+    CARD_NAMES = [ "assassin", "contessa", "duke", "captain", "ambassador" ]
     def __init__(self, Name: str):
         self._name = Name
         self._playerDict = {}
@@ -111,15 +111,18 @@ class CoupGame:
         return False
     
     def playerKillCard(self, playerName: str, cardName: str):
+        playerDead = False
         if not cardName.lower() in self.CARD_NAMES:
-            return False
+            return False, playerDead
         if not self.isValidPlayer(playerName):
-            return False
+            return False, playerDead
 
-        if self._playerDict[playerName].removeCard(cardName):
+        if self._playerDict[playerName].removeCard(cardName, kill=True):
             self._deadCards.append(cardName)
-            return True
-        return False
+            if self._playerDict[playerName].getDeadCards() >= 2:
+                playerDead = True
+            return True, playerDead
+        return False, playerDead
             
 
 
@@ -134,6 +137,7 @@ class Player:
         self._name = name
         self._cards = []
         self._coins = 0
+        self._deadCards = 0
     
     def summary(self, hideCardIdentities):
         if hideCardIdentities:
@@ -154,11 +158,13 @@ class Player:
     def addCard(self, cardName: str):
         self._cards.append(cardName)
     
-    def removeCard(self, cardName: str):
+    def removeCard(self, cardName: str, kill = False):
         len1 = len(self._cards)
         success = True
         try:
             self._cards.remove(cardName)
+            if kill:
+                self._deadCards += 1
         except:
             success = False
         return success
@@ -166,3 +172,6 @@ class Player:
     def getHand(self, cardsLeft = []):
         cardsLeft.append(len(self._cards))
         return ', '.join(self._cards)
+
+    def getDeadCards(self):
+        return self._deadCards

@@ -3,6 +3,7 @@ from slack import WebClient
 from CoupGame import CoupGame
 import traceback
 from functionWrapper import functionWrapper
+from Insults import InsultGenerator
 
 def matchTextInArray(textToFind: str, textList: list, separator = ' ', removeMatchedTextFromSearchList = False):
     ret = False
@@ -31,6 +32,7 @@ class CoupSlackBotMsgInterface:
     ERR_PLAYER_IS_ALREADY_IN_GAME = "Player is already in the game."
 
     def __init__(self, webclient):
+        self._insults = InsultGenerator()
         self._webclient = webclient
         self._gameChannelID = ""
         self._username = "coupslackbot"
@@ -41,7 +43,8 @@ class CoupSlackBotMsgInterface:
         self._ValidAdminCommands = {
             'help':         functionWrapper(0, self._adminInterfaceFn_sendInstructionListAdmin),
             'startnewgame': functionWrapper(1, self._adminInterfaceFn_startNewGame), #name of game as arg
-            'addplayer':    functionWrapper(1, self._adminInterfaceFn_AddPlayer)         #name of user as arg
+            'addplayer':    functionWrapper(1, self._adminInterfaceFn_AddPlayer),         #name of user as arg
+            'ghostwrite':   functionWrapper(2, self._adminInterfaceFn_GhostWrite)         #name of user + msg as args
         }
         self._ValidCommands = {
             'help':                     functionWrapper(0, self._interfaceFn_sendInsructionList),
@@ -244,6 +247,32 @@ class CoupSlackBotMsgInterface:
         txt += "debug"
         self._sendMessageToAdmin(txt)
 
+    def _adminInterfaceFn_GhostWrite(self, playerNameArgs: list, userId: str):
+        if not userId == ADMIN_USER:
+            return
+
+        #check if the user exists in the workspace
+        playerID = self._getUserIdFromDisplayName(playerNameArgs)
+        if (len(playerID) < 1):
+            self._sendMessageToAdmin(self.ERR_PLAYER_ID_NOT_FOUND)
+            return
+
+        '''TODO
+        playerDisplayName = self._getDisplayNameFromUserId(playerID)
+        try:
+            self._webclient.conversations_invite(channel=self._gameChannelID,users=playerID)
+        except:
+            txt = self.ERR_UNABLE_TO_ADD_PLAYER + traceback.format_exc()
+            self._sendMessageToAdmin(txt)
+            return
+        else:
+            self._playerRoster[playerID] = playerDisplayName
+            self._coupgame.AddPlayer(playerDisplayName)
+            self._sendMessageToAdmin(self.SUCCESS_MSG)
+            txt = playerDisplayName + " has joined the game!"
+            self._postGeneralMessage(txt)
+            return'''
+
     ''' ************* Normal interface functions ************* '''
     def _interfaceFn_sendInsructionList(self, dummyArgs: list, userId: str):
         txt = "List of commands:\n"
@@ -294,19 +323,25 @@ class CoupSlackBotMsgInterface:
     def _interfaceFn_userKillCard(self, cardNameArgList: list, userId: str):
         cardName = cardNameArgList[0]
         txt = ""
+        playerLost = False
         if userId in self._playerRoster.keys():
             dispName = self._playerRoster[userId]
-            result = self._coupgame.playerKillCard(dispName, cardName)
+            result, playerLost = self._coupgame.playerKillCard(dispName, cardName)
             if result == True:
-                cardsLeft = []
-                txt = "Your hand contains: " + self._coupgame.getPlayerHand(dispName, cardsLeft)
+                cardsLeft = [0]
+                if playerLost:
+                    txt = "You have no more cards."
+                else:
+                    txt = "Your hand contains: " + self._coupgame.getPlayerHand(dispName, cardsLeft)
                 generalTxt = dispName + " has lost a " + cardName + " and has " + str(cardsLeft[0]) + " cards remaining)."
                 self._postGeneralMessage(generalTxt)
             else:
                 txt = "Unable to kill " + cardName + '.'
         else:
             txt = "You are not in the game!"
-        self._sendMessageToUser(txt, userId) 
+        self._sendMessageToUser(txt, userId)
+        if playerLost:
+            self._sendMessageToUser(self._insults.randomInsult(), userId)
         return #todo
     
     def _interfaceFn_sendStatusMsg(self, playerNameArgList: list, userId: str):

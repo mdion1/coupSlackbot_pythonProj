@@ -19,3 +19,7 @@ numerals vs words - "two 2" -- fixed
 correct "steal two coins from" in help menu -- fixe
 track turn order, prompt user when it's their turn, "whose turn?" command
 sarcastic trash talking responses when you lose a card?
+
+command 'show <card>'
+
+bug--kill card shows card in dead pile but doesn't delete
